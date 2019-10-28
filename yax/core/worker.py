@@ -21,16 +21,17 @@ class Worker:
     def __init__(self, id, on_apply, on_done_payload, maxsize=1, loop=None):
         self.id = id
         self.maxsize = maxsize
+        self._tasks = 0
         self._loop = loop if loop else asyncio.get_event_loop()
         self._queue = _Queue(maxsize=maxsize)
         self._on_apply = on_apply
         self._on_done_payload = on_done_payload
 
     def full(self):
-        return self._queue.full()
+        return self._queue._unfinished_tasks == self.maxsize
 
     def empty(self):
-        return self._queue.empty()
+        return self._queue._unfinished_tasks <= self.maxsize - 1
 
     def size(self):
         return self._queue.unfinished_tasks
@@ -51,8 +52,12 @@ class Worker:
 
     async def _actual_apply(self, payload):
         print("started apply")
+        print("Payload:", payload)
         await asyncio.sleep(2)
         print("done apply")
+
+    def __repr__(self):
+        return f"<Task id={self.id}>"
 
 
 class Workers:
@@ -77,6 +82,7 @@ class Workers:
         return self._workers[id]
 
     def _on_apply(self, worker: Worker):
+        print(worker, worker.size(), self._free_workers)
         if worker.full():
             self._free_workers -= 1
 
