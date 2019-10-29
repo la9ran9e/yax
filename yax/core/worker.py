@@ -3,13 +3,19 @@ import asyncio
 from .payload import Payload
 
 
+class _Queue(asyncio.Queue):
+    @property
+    def unfinished_tasks(self):
+        return self._unfinished_tasks
+
+
 class Worker:
     def __init__(self, id, on_apply, on_done_payload, maxsize=1, loop=None):
         self.id = id
         self.maxsize = maxsize
         self._tasks = 0
         self._loop = loop if loop else asyncio.get_event_loop()
-        self._queue = asyncio.Queue(maxsize=maxsize)
+        self._queue = _Queue(maxsize=maxsize)
         self._on_apply = on_apply
         self._on_done_payload = on_done_payload
 
@@ -20,7 +26,7 @@ class Worker:
         return self._queue._unfinished_tasks <= self.maxsize - 1
 
     def size(self):
-        return self._queue._unfinished_tasks
+        return self._queue.unfinished_tasks
 
     async def join(self):
         await self._queue.join()
