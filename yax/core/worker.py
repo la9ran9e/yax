@@ -1,14 +1,6 @@
 import asyncio
 
-
-class Payload:
-    # TODO: better implementation required
-    def __init__(self, msg):
-        self.msg = msg
-
-    @property
-    def id(self):
-        return self.msg["id"]
+from .payload import Payload
 
 
 class Worker:
@@ -55,10 +47,11 @@ class Worker:
 
 
 class Workers:
-    def __init__(self, workers_ids: list, loop=None):
+    def __init__(self, maxsize=1, loop=None):
+        self._maxsize = maxsize
         self._loop = loop if loop else asyncio.get_event_loop()
-        self._workers = {id: Worker(id, self._on_apply, self._on_done_payload, maxsize=1, loop=self._loop) for id in workers_ids}
-        self._free_workers = len(self._workers)
+        self._workers = dict()
+        self._free_workers = 2  # TODO: get shard map from bootstrap server
         self._cond = asyncio.Condition(loop=self._loop)
 
     @property
@@ -67,12 +60,17 @@ class Workers:
 
     async def apply(self, payload):
         async with self._cond:
+            worker = self._get_worker(await payload.hash())
             if self.full:
                 await self._cond.wait()
-            worker = self._get_worker(payload.id)
             worker.apply(payload)
 
     def _get_worker(self, id):
+        print("Hash:", id)
+        if id not in self._workers:
+            self._workers[id] = Worker(
+                id, self._on_apply, self._on_done_payload, maxsize=self._maxsize, loop=self._loop
+            )
         return self._workers[id]
 
     def _on_apply(self, worker: Worker):

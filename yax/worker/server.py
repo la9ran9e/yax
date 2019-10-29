@@ -1,25 +1,21 @@
-import asyncio
-
-from yax.core.worker import Workers, Payload
+from yax.core.worker import Workers
 
 from pyshard.core.server import ServerBase
 
 
 class Server(ServerBase):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, payload_factory, **kwargs):
         self._queue_class = Workers
         self._queue: Workers = None
+        self._payload_factory = payload_factory
         super(Server, self).__init__(*args, **kwargs)
 
-    def run(self):
-        worker_ids = self._read_config()
-        self._queue = Workers(worker_ids)
-        self._loop.run_until_complete(self._do_run())
+    async def run(self):
+        self._queue = Workers(maxsize=1)
+        await self._do_run()
 
     @ServerBase.endpoint("apply")
-    async def apply(self, payload):
-        await self._queue.apply(Payload(payload))
+    async def apply(self, index, key, payload):
+        print(index, key, payload)
+        await self._queue.apply(self._payload_factory(index, key, payload))
         print(self._queue.stats())
-
-    def _read_config(self):
-        return [1, 2, 3]
